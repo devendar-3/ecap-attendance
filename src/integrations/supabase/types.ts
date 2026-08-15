@@ -14,7 +14,124 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      attendance_records: {
+        Row: {
+          created_at: string
+          flag_reason: string | null
+          id: string
+          id_photo_url: string | null
+          matched_roll: string | null
+          name: string | null
+          roll_number: string
+          selfie_hash: string | null
+          selfie_url: string | null
+          session_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          flag_reason?: string | null
+          id?: string
+          id_photo_url?: string | null
+          matched_roll?: string | null
+          name?: string | null
+          roll_number: string
+          selfie_hash?: string | null
+          selfie_url?: string | null
+          session_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          flag_reason?: string | null
+          id?: string
+          id_photo_url?: string | null
+          matched_roll?: string | null
+          name?: string | null
+          roll_number?: string
+          selfie_hash?: string | null
+          selfie_url?: string | null
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_records_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roster_students: {
+        Row: {
+          created_at: string
+          id: string
+          name: string | null
+          roll_number: string
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          roll_number: string
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string | null
+          roll_number?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roster_students_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sessions: {
+        Row: {
+          created_at: string
+          expected_count: number | null
+          id: string
+          is_open: boolean
+          join_code: string
+          roll_format: string
+          roll_regex: string | null
+          teacher_code: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          expected_count?: number | null
+          id?: string
+          is_open?: boolean
+          join_code: string
+          roll_format?: string
+          roll_regex?: string | null
+          teacher_code: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          expected_count?: number | null
+          id?: string
+          is_open?: boolean
+          join_code?: string
+          roll_format?: string
+          roll_regex?: string | null
+          teacher_code?: string
+          title?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
