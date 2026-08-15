@@ -66,7 +66,9 @@ function StudentFlow() {
       const raw = await fileToDataUrl(file);
       const shrunk = await downscaleToJpeg(raw, 900, 0.75);
       setIdPhoto(shrunk);
-      const res = await runReadIdCard({ data: { image: shrunk, format: session?.roll_format || undefined } });
+      const res = await runReadIdCard({
+        data: session?.roll_format ? { image: shrunk, format: session.roll_format } : { image: shrunk },
+      });
       if (!res.readable && !res.rollNumber) {
         setError("That picture wasn't readable. Retake it in better light, or type your details below.");
       }
