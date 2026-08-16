@@ -25,7 +25,6 @@ export const Route = createFileRoute("/s/$code")({
 });
 
 type SessionRow = {
-  id: string;
   title: string;
   roll_format: string | null;
   roll_regex: string | null;
@@ -35,6 +34,8 @@ type SessionRow = {
 function StudentFlow() {
   const { code } = Route.useParams();
   const runReadIdCard = useServerFn(readIdCard);
+  const runGetSession = useServerFn(getStudentSession);
+  const runSubmit = useServerFn(submitAttendance);
 
   const [session, setSession] = useState<SessionRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,14 +51,15 @@ function StudentFlow() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("sessions")
-        .select("id,title,roll_format,roll_regex,is_open")
-        .eq("join_code", code.toUpperCase())
-        .maybeSingle();
-      setSession((data as SessionRow) ?? null);
+      try {
+        const { session: s } = await runGetSession({ data: { code: code.toUpperCase() } });
+        setSession(s ?? null);
+      } catch {
+        setSession(null);
+      }
       setLoading(false);
     })();
+
   }, [code]);
 
   async function onIdSelected(file: File) {
