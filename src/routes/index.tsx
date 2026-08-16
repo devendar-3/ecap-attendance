@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { ScanLine, Camera, FileDown, ShieldAlert } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
-import { randomCode } from "@/lib/session";
+import { createSession as createSessionFn } from "@/lib/rollcall.functions";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
