@@ -13,10 +13,18 @@ import {
   Users,
 } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { readRosterFile } from "@/lib/attendance.functions";
+import {
+  deleteRecord,
+  getTeacherDashboard,
+  markRosterPresent as markRosterPresentFn,
+  saveRoster,
+  setRecordStatus,
+  setSessionOpen,
+} from "@/lib/rollcall.functions";
 import { fileToDataUrl } from "@/lib/imaging";
 import { downloadFile, toCsv } from "@/lib/session";
+
 
 export const Route = createFileRoute("/t/$teacherCode")({
   head: () => ({
@@ -61,6 +69,12 @@ type Roster = { id: string; roll_number: string; name: string | null };
 function TeacherDashboard() {
   const { teacherCode } = Route.useParams();
   const runReadRoster = useServerFn(readRosterFile);
+  const runDashboard = useServerFn(getTeacherDashboard);
+  const runSaveRoster = useServerFn(saveRoster);
+  const runSetStatus = useServerFn(setRecordStatus);
+  const runDeleteRecord = useServerFn(deleteRecord);
+  const runMarkPresent = useServerFn(markRosterPresentFn);
+  const runSetOpen = useServerFn(setSessionOpen);
 
   const [session, setSession] = useState<SessionRow | null>(null);
   const [records, setRecords] = useState<Record_[]>([]);
@@ -70,42 +84,29 @@ function TeacherDashboard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [tab, setTab] = useState<"present" | "flagged" | "absent">("present");
 
-  const refresh = useCallback(async (sessionId: string) => {
-    const [{ data: recs }, { data: ros }] = await Promise.all([
-      supabase.from("attendance_records").select("*").eq("session_id", sessionId).order("created_at"),
-      supabase.from("roster_students").select("id,roll_number,name").eq("session_id", sessionId).order("roll_number"),
-    ]);
-    setRecords((recs as Record_[]) ?? []);
-    setRoster((ros as Roster[]) ?? []);
-  }, []);
+  const refresh = useCallback(async () => {
+    const res = await runDashboard({ data: { teacherCode } });
+    setSession((res.session as SessionRow) ?? null);
+    setRecords((res.records as Record_[]) ?? []);
+    setRoster((res.roster as Roster[]) ?? []);
+  }, [runDashboard, teacherCode]);
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("sessions")
-        .select("id,title,join_code,roll_format,is_open")
-        .eq("teacher_code", teacherCode)
-        .maybeSingle();
-      const s = (data as SessionRow) ?? null;
-      setSession(s);
-      if (s) await refresh(s.id);
+      try {
+        await refresh();
+      } catch {
+        setSession(null);
+      }
       setLoading(false);
     })();
-  }, [teacherCode, refresh]);
+  }, [refresh]);
 
+  // Tables are server-guarded, so poll for new submissions instead of subscribing.
   useEffect(() => {
     if (!session) return;
-    const channel = supabase
-      .channel(`attendance-${session.id}`)
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "attendance_records", filter: `session_id=eq.${session.id}` },
-        () => void refresh(session.id),
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
-    };
+    const timer = setInterval(() => void refresh().catch(() => undefined), 5000);
+    return () => clearInterval(timer);
   }, [session, refresh]);
 
   async function uploadRoster(file: File) {
@@ -119,17 +120,9 @@ function TeacherDashboard() {
         setNotice("No student rows could be read from that file.");
         return;
       }
-      const { error } = await supabase.from("roster_students").upsert(
-        students.map((s) => ({
-          session_id: session.id,
-          roll_number: s.roll_number.toUpperCase(),
-          name: s.name,
-        })),
-        { onConflict: "session_id,roll_number" },
-      );
-      if (error) throw new Error("Could not save the class list");
+      await runSaveRoster({ data: { teacherCode, students } });
       setNotice(`Added ${students.length} students to the class list.`);
-      await refresh(session.id);
+      await refresh();
       setTab("absent");
     } catch (e) {
       setNotice(e instanceof Error ? e.message : "Upload failed");
@@ -139,32 +132,26 @@ function TeacherDashboard() {
   }
 
   async function setStatus(id: string, status: string) {
-    await supabase.from("attendance_records").update({ status, flag_reason: null }).eq("id", id);
-    if (session) await refresh(session.id);
+    await runSetStatus({ data: { teacherCode, recordId: id, status } });
+    await refresh();
   }
 
   async function removeRecord(id: string) {
-    await supabase.from("attendance_records").delete().eq("id", id);
-    if (session) await refresh(session.id);
+    await runDeleteRecord({ data: { teacherCode, recordId: id } });
+    await refresh();
   }
 
   async function markRosterPresent(student: Roster) {
-    if (!session) return;
-    await supabase.from("attendance_records").insert({
-      session_id: session.id,
-      roll_number: student.roll_number,
-      name: student.name,
-      status: "present",
-      flag_reason: "Marked manually by teacher",
-    });
-    await refresh(session.id);
+    await runMarkPresent({ data: { teacherCode, rollNumber: student.roll_number, name: student.name } });
+    await refresh();
   }
 
   async function toggleOpen() {
     if (!session) return;
-    await supabase.from("sessions").update({ is_open: !session.is_open }).eq("id", session.id);
+    await runSetOpen({ data: { teacherCode, isOpen: !session.is_open } });
     setSession({ ...session, is_open: !session.is_open });
   }
+
 
   if (loading) {
     return (

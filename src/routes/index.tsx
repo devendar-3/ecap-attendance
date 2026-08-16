@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import { ScanLine, Camera, FileDown, ShieldAlert } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
-import { randomCode } from "@/lib/session";
+import { createSession as createSessionFn } from "@/lib/rollcall.functions";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -29,6 +30,7 @@ export const Route = createFileRoute("/")({
 
 function Home() {
   const navigate = useNavigate();
+  const runCreateSession = useServerFn(createSessionFn);
   const [title, setTitle] = useState("");
   const [format, setFormat] = useState("");
   const [creating, setCreating] = useState(false);
@@ -40,25 +42,18 @@ function Home() {
     setError(null);
     if (!title.trim()) return setError("Give the session a name");
     setCreating(true);
-    const teacherCode = randomCode(10);
-    const { data, error: dbError } = await supabase
-      .from("sessions")
-      .insert({
-        title: title.trim(),
-        join_code: randomCode(6),
-        teacher_code: teacherCode,
-        roll_format: format.trim(),
-        roll_regex: format.trim() || null,
-      })
-      .select()
-      .single();
-    setCreating(false);
-    if (dbError || !data) {
+    try {
+      const { teacherCode } = await runCreateSession({
+        data: { title: title.trim(), format: format.trim() },
+      });
+      navigate({ to: "/t/$teacherCode", params: { teacherCode } });
+    } catch {
       setError("Could not create the session. Please try again.");
-      return;
+    } finally {
+      setCreating(false);
     }
-    navigate({ to: "/t/$teacherCode", params: { teacherCode } });
   }
+
 
   return (
     <main className="mx-auto w-full max-w-5xl px-5 py-12 sm:py-16">

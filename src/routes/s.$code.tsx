@@ -3,10 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Loader2, RefreshCw, ScanLine, Camera, AlertTriangle } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { readIdCard } from "@/lib/attendance.functions";
-import { downscaleToJpeg, fileToDataUrl, hammingDistance, perceptualHash, DUPLICATE_THRESHOLD } from "@/lib/imaging";
+import { getStudentSession, submitAttendance } from "@/lib/rollcall.functions";
+import { downscaleToJpeg, fileToDataUrl, perceptualHash } from "@/lib/imaging";
 import { matchesPattern } from "@/lib/session";
+
 
 export const Route = createFileRoute("/s/$code")({
   head: () => ({
@@ -24,7 +25,6 @@ export const Route = createFileRoute("/s/$code")({
 });
 
 type SessionRow = {
-  id: string;
   title: string;
   roll_format: string | null;
   roll_regex: string | null;
@@ -34,6 +34,8 @@ type SessionRow = {
 function StudentFlow() {
   const { code } = Route.useParams();
   const runReadIdCard = useServerFn(readIdCard);
+  const runGetSession = useServerFn(getStudentSession);
+  const runSubmit = useServerFn(submitAttendance);
 
   const [session, setSession] = useState<SessionRow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -49,14 +51,15 @@ function StudentFlow() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("sessions")
-        .select("id,title,roll_format,roll_regex,is_open")
-        .eq("join_code", code.toUpperCase())
-        .maybeSingle();
-      setSession((data as SessionRow) ?? null);
+      try {
+        const { session: s } = await runGetSession({ data: { code: code.toUpperCase() } });
+        setSession(s ?? null);
+      } catch {
+        setSession(null);
+      }
       setLoading(false);
     })();
+
   }, [code]);
 
   async function onIdSelected(file: File) {
@@ -87,39 +90,20 @@ function StudentFlow() {
     setBusy("Checking your photo…");
     try {
       const hash = await perceptualHash(selfieData);
-      const rollValue = roll.trim().toUpperCase();
-
-      const { data: existing } = await supabase
-        .from("attendance_records")
-        .select("roll_number,selfie_hash")
-        .eq("session_id", session.id);
-
-      const already = (existing ?? []).find((r) => r.roll_number.toUpperCase() === rollValue);
-      if (already) {
-        setBusy(null);
-        setError("This roll number has already been marked in this session.");
-        return;
-      }
-
-      const clash = (existing ?? []).find(
-        (r) => r.selfie_hash && hammingDistance(r.selfie_hash, hash) <= DUPLICATE_THRESHOLD,
-      );
-
-      const { error: dbError } = await supabase.from("attendance_records").insert({
-        session_id: session.id,
-        roll_number: rollValue,
-        name: name.trim() || null,
-        id_photo_url: idPhoto,
-        selfie_url: selfieData,
-        selfie_hash: hash,
-        status: clash ? "flagged" : "present",
-        flag_reason: clash ? "Selfie looks identical to another student's photo" : null,
-        matched_roll: clash?.roll_number ?? null,
+      const res = await runSubmit({
+        data: {
+          code: code.toUpperCase(),
+          rollNumber: roll.trim().toUpperCase(),
+          name: name.trim(),
+          idPhoto,
+          selfie: selfieData,
+          selfieHash: hash,
+        },
       });
-      if (dbError) throw new Error("Could not save your attendance. Please try again.");
 
-      setResult({ flagged: Boolean(clash), matched: clash?.roll_number ?? null });
+      setResult({ flagged: res.flagged, matched: res.matched });
       setStep(3);
+
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
