@@ -13,10 +13,18 @@ import {
   Users,
 } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { readRosterFile } from "@/lib/attendance.functions";
+import {
+  deleteRecord,
+  getTeacherDashboard,
+  markRosterPresent as markRosterPresentFn,
+  saveRoster,
+  setRecordStatus,
+  setSessionOpen,
+} from "@/lib/rollcall.functions";
 import { fileToDataUrl } from "@/lib/imaging";
 import { downloadFile, toCsv } from "@/lib/session";
+
 
 export const Route = createFileRoute("/t/$teacherCode")({
   head: () => ({
