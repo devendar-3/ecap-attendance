@@ -3,10 +3,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { CheckCircle2, Loader2, RefreshCw, ScanLine, Camera, AlertTriangle } from "lucide-react";
 
-import { supabase } from "@/integrations/supabase/client";
 import { readIdCard } from "@/lib/attendance.functions";
-import { downscaleToJpeg, fileToDataUrl, hammingDistance, perceptualHash, DUPLICATE_THRESHOLD } from "@/lib/imaging";
+import { getStudentSession, submitAttendance } from "@/lib/rollcall.functions";
+import { downscaleToJpeg, fileToDataUrl, perceptualHash } from "@/lib/imaging";
 import { matchesPattern } from "@/lib/session";
+
 
 export const Route = createFileRoute("/s/$code")({
   head: () => ({
