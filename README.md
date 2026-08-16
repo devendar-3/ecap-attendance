@@ -1,6 +1,7 @@
 # Presence Checker
-
-create me an dynamic website that every one can create an session on their own for any number of students based on rollnumbers as input example they should give the rollnumber formate so when the student access the session code and first scan their id that scan the details and rollnumber and second click a live picture of live so match it with all at end if found any same pic of 2 different number let teacher know it and manually mark present and finally create an file of all presents to download or export it. create an option to upload a pdf on students details such that separate who is absent so teacher can easily identify absentece rigth. no logins
+Abstract:
+RollCall is a frictionless attendance system that requires no user accounts or installs. A teacher creates a session, gets a student join code and a private teacher dashboard link, and optionally defines a roll-number format. Students open the session link, photograph their ID card to auto-read their roll number and name, then take a live selfie. A perceptual hash checks whether the same selfie was submitted under a different roll number, flagging possible duplicates for the teacher. Teachers can also upload a class roster PDF to identify absentees, manually mark missing students as present or resolve flagged records, and export the final present/absent list as a CSV. All database access is gated through server-side functions that verify the join code or teacher code, so no one without a code can access session data.
+ 
 
 This project was built with [Lovable](https://lovable.dev).
 
