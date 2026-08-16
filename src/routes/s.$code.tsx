@@ -90,39 +90,20 @@ function StudentFlow() {
     setBusy("Checking your photo…");
     try {
       const hash = await perceptualHash(selfieData);
-      const rollValue = roll.trim().toUpperCase();
-
-      const { data: existing } = await supabase
-        .from("attendance_records")
-        .select("roll_number,selfie_hash")
-        .eq("session_id", session.id);
-
-      const already = (existing ?? []).find((r) => r.roll_number.toUpperCase() === rollValue);
-      if (already) {
-        setBusy(null);
-        setError("This roll number has already been marked in this session.");
-        return;
-      }
-
-      const clash = (existing ?? []).find(
-        (r) => r.selfie_hash && hammingDistance(r.selfie_hash, hash) <= DUPLICATE_THRESHOLD,
-      );
-
-      const { error: dbError } = await supabase.from("attendance_records").insert({
-        session_id: session.id,
-        roll_number: rollValue,
-        name: name.trim() || null,
-        id_photo_url: idPhoto,
-        selfie_url: selfieData,
-        selfie_hash: hash,
-        status: clash ? "flagged" : "present",
-        flag_reason: clash ? "Selfie looks identical to another student's photo" : null,
-        matched_roll: clash?.roll_number ?? null,
+      const res = await runSubmit({
+        data: {
+          code: code.toUpperCase(),
+          rollNumber: roll.trim().toUpperCase(),
+          name: name.trim(),
+          idPhoto,
+          selfie: selfieData,
+          selfieHash: hash,
+        },
       });
-      if (dbError) throw new Error("Could not save your attendance. Please try again.");
 
-      setResult({ flagged: Boolean(clash), matched: clash?.roll_number ?? null });
+      setResult({ flagged: res.flagged, matched: res.matched });
       setStep(3);
+
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong");
     } finally {
