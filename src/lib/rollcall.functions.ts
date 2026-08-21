@@ -220,6 +220,7 @@ export const submitAttendance = createServerFn({ method: "POST" })
       status: clash ? "flagged" : "present",
       flag_reason: clash ? "Selfie looks identical to another student's photo" : null,
       matched_roll: clash?.roll_number ?? null,
+      distance_m: distance,
     });
     if (error) throw new Error("Could not save your attendance. Please try again.");
 
