@@ -233,7 +233,7 @@ export const getTeacherDashboard = createServerFn({ method: "POST" })
     const db = await admin();
     const { data: session } = await db
       .from("sessions")
-      .select("id,title,join_code,roll_format,is_open")
+      .select("id,title,join_code,roll_format,is_open,geo_lat,geo_lng,geo_radius_m")
       .eq("teacher_code", data.teacherCode)
       .maybeSingle();
     if (!session) return { session: null, records: [], roster: [] };
