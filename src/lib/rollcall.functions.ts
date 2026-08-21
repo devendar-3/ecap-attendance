@@ -140,6 +140,9 @@ export const getStudentSession = createServerFn({ method: "POST" })
         roll_format: session.roll_format,
         roll_regex: session.roll_regex,
         is_open: session.is_open,
+        // Never expose the exact classroom coordinates — only that a fence exists.
+        requires_location: session.geo_lat != null && session.geo_lng != null,
+        geo_radius_m: session.geo_radius_m,
       },
     };
   });
@@ -153,6 +156,9 @@ export const submitAttendance = createServerFn({ method: "POST" })
       idPhoto?: string | null;
       selfie: string;
       selfieHash: string;
+      lat?: number | null;
+      lng?: number | null;
+      accuracy?: number | null;
     }) => ({
       code: str(data?.code, 16).toUpperCase(),
       rollNumber: str(data?.rollNumber, 40).toUpperCase(),
@@ -160,6 +166,9 @@ export const submitAttendance = createServerFn({ method: "POST" })
       idPhoto: optionalImage(data?.idPhoto ?? null),
       selfie: optionalImage(data?.selfie),
       selfieHash: str(data?.selfieHash, 64),
+      lat: coord(data?.lat ?? null, 90),
+      lng: coord(data?.lng ?? null, 180),
+      accuracy: data?.accuracy == null ? null : Math.max(0, Number(data.accuracy) || 0),
     }),
   )
   .handler(async ({ data }) => {
@@ -167,6 +176,25 @@ export const submitAttendance = createServerFn({ method: "POST" })
     if (!session) throw new Error("Session not found");
     if (!session.is_open) throw new Error("This session is closed");
     if (!data.rollNumber) throw new Error("A roll number is required");
+
+    // Location fence — checked on the server so it can't be skipped from the browser.
+    let distance: number | null = null;
+    if (session.geo_lat != null && session.geo_lng != null) {
+      if (data.lat == null || data.lng == null) {
+        throw new Error("This session needs your location. Allow location access and try again.");
+      }
+      distance = Math.round(
+        distanceMeters(session.geo_lat, session.geo_lng, data.lat, data.lng),
+      );
+      const allowed =
+        (session.geo_radius_m ?? 100) + Math.min(data.accuracy ?? 0, ACCURACY_TOLERANCE_M);
+      if (distance > allowed) {
+        throw new Error(
+          `You're about ${distance} m from where this session was started. You must be inside the classroom to mark attendance.`,
+        );
+      }
+    }
+
 
     const { data: existing } = await db
       .from("attendance_records")
