@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { hammingDistance, DUPLICATE_THRESHOLD } from "./imaging";
+import { ACCURACY_TOLERANCE_M, distanceMeters } from "./geo";
 import { randomCode } from "./session";
 
 /**
