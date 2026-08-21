@@ -131,13 +131,52 @@ function Home() {
                 <span className="font-mono">99AA9999</span> matches <span className="font-mono">22CS0147</span>.
               </p>
             </div>
+            <div className="rounded-lg border border-border bg-muted/40 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input
+                  type="checkbox"
+                  checked={lockLocation}
+                  onChange={(e) => setLockLocation(e.target.checked)}
+                  className="mt-0.5 size-4 accent-[hsl(var(--accent))]"
+                />
+                <span>
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <MapPin className="size-4 text-accent" /> Lock to this classroom
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">
+                    Attendance is only accepted from devices near where you create the session, so a
+                    shared link is useless outside the room.
+                  </span>
+                </span>
+              </label>
+              {lockLocation && (
+                <div className="mt-3 flex items-center gap-2 pl-7">
+                  <label htmlFor="radius" className="text-xs text-muted-foreground">
+                    Allowed distance
+                  </label>
+                  <select
+                    id="radius"
+                    value={radiusM}
+                    onChange={(e) => setRadiusM(Number(e.target.value))}
+                    className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
+                  >
+                    {RADIUS_OPTIONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r} m
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <button
               type="submit"
               disabled={creating}
-              className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-60"
             >
-              {creating ? "Creating…" : "Create session"}
+              {creating && <Loader2 className="size-4 animate-spin" />}
+              {locating ? "Getting your location…" : creating ? "Creating…" : "Create session"}
             </button>
           </form>
         </section>
