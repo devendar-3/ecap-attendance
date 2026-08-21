@@ -1,12 +1,13 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { CheckCircle2, Loader2, RefreshCw, ScanLine, Camera, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Loader2, RefreshCw, ScanLine, Camera, AlertTriangle, MapPin } from "lucide-react";
 
 import { readIdCard } from "@/lib/attendance.functions";
 import { getStudentSession, submitAttendance } from "@/lib/rollcall.functions";
 import { downscaleToJpeg, fileToDataUrl, perceptualHash } from "@/lib/imaging";
 import { matchesPattern } from "@/lib/session";
+import { readPosition } from "@/lib/geo";
 
 
 export const Route = createFileRoute("/s/$code")({
@@ -29,6 +30,8 @@ type SessionRow = {
   roll_format: string | null;
   roll_regex: string | null;
   is_open: boolean;
+  requires_location?: boolean;
+  geo_radius_m?: number | null;
 };
 
 function StudentFlow() {
@@ -87,8 +90,13 @@ function StudentFlow() {
   async function submit(selfieData: string) {
     if (!session) return;
     setError(null);
-    setBusy("Checking your photo…");
     try {
+      let where: { lat: number; lng: number; accuracy: number } | null = null;
+      if (session.requires_location) {
+        setBusy("Confirming you're in the classroom…");
+        where = await readPosition();
+      }
+      setBusy("Checking your photo…");
       const hash = await perceptualHash(selfieData);
       const res = await runSubmit({
         data: {
@@ -98,6 +106,9 @@ function StudentFlow() {
           idPhoto,
           selfie: selfieData,
           selfieHash: hash,
+          lat: where?.lat ?? null,
+          lng: where?.lng ?? null,
+          accuracy: where?.accuracy ?? null,
         },
       });
 
@@ -148,6 +159,12 @@ function StudentFlow() {
     <main className="mx-auto w-full max-w-lg px-5 py-10">
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">Attendance</p>
       <h1 className="mt-1 text-2xl font-bold">{session.title}</h1>
+      {session.requires_location && (
+        <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
+          <MapPin className="size-3.5 text-accent" /> Location-locked — you must be within{" "}
+          {session.geo_radius_m ?? 100} m of the classroom
+        </p>
+      )}
 
       <ol className="mt-6 flex items-center gap-2 text-xs font-medium">
         {[1, 2, 3].map((n) => (

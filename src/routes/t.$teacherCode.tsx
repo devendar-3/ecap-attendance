@@ -11,6 +11,7 @@ import {
   Trash2,
   UserX,
   Users,
+  MapPin,
 } from "lucide-react";
 
 import { readRosterFile } from "@/lib/attendance.functions";
@@ -21,7 +22,9 @@ import {
   saveRoster,
   setRecordStatus,
   setSessionOpen,
+  setSessionGeofence,
 } from "@/lib/rollcall.functions";
+import { RADIUS_OPTIONS, readPosition } from "@/lib/geo";
 import { fileToDataUrl } from "@/lib/imaging";
 import { downloadFile, toCsv } from "@/lib/session";
 
@@ -50,6 +53,9 @@ type SessionRow = {
   join_code: string;
   roll_format: string | null;
   is_open: boolean;
+  geo_lat: number | null;
+  geo_lng: number | null;
+  geo_radius_m: number | null;
 };
 
 type Record_ = {
@@ -61,6 +67,7 @@ type Record_ = {
   status: string;
   flag_reason: string | null;
   matched_roll: string | null;
+  distance_m: number | null;
   created_at: string;
 };
 
@@ -75,6 +82,8 @@ function TeacherDashboard() {
   const runDeleteRecord = useServerFn(deleteRecord);
   const runMarkPresent = useServerFn(markRosterPresentFn);
   const runSetOpen = useServerFn(setSessionOpen);
+  const runSetGeofence = useServerFn(setSessionGeofence);
+  const [fenceBusy, setFenceBusy] = useState(false);
 
   const [session, setSession] = useState<SessionRow | null>(null);
   const [records, setRecords] = useState<Record_[]>([]);
@@ -144,6 +153,25 @@ function TeacherDashboard() {
   async function markRosterPresent(student: Roster) {
     await runMarkPresent({ data: { teacherCode, rollNumber: student.roll_number, name: student.name } });
     await refresh();
+  }
+
+  async function toggleFence(enable: boolean, radiusM: number) {
+    if (!session) return;
+    setFenceBusy(true);
+    setNotice(null);
+    try {
+      if (enable) {
+        const pos = await readPosition();
+        await runSetGeofence({ data: { teacherCode, lat: pos.lat, lng: pos.lng, radiusM } });
+      } else {
+        await runSetGeofence({ data: { teacherCode, lat: null, lng: null, radiusM: null } });
+      }
+      await refresh();
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : "Could not update the classroom lock");
+    } finally {
+      setFenceBusy(false);
+    }
   }
 
   async function toggleOpen() {

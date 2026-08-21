@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { hammingDistance, DUPLICATE_THRESHOLD } from "./imaging";
+import { ACCURACY_TOLERANCE_M, distanceMeters } from "./geo";
 import { randomCode } from "./session";
 
 /**
@@ -31,12 +32,26 @@ async function admin() {
   return supabaseAdmin;
 }
 
+function coord(value: unknown, limit: number): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || Math.abs(n) > limit) throw new Error("Invalid location");
+  return n;
+}
+
+function radius(value: unknown): number | null {
+  if (value == null) return null;
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 20 || n > 5000) throw new Error("Invalid radius");
+  return n;
+}
+
 /** Resolves the session behind a teacher code, or throws. */
 async function requireTeacherSession(teacherCode: string) {
   const db = await admin();
   const { data } = await db
     .from("sessions")
-    .select("id,title,join_code,roll_format,is_open")
+    .select("id,title,join_code,roll_format,is_open,geo_lat,geo_lng,geo_radius_m")
     .eq("teacher_code", teacherCode)
     .maybeSingle();
   if (!data) throw new Error("Not found");
@@ -47,7 +62,7 @@ async function requireStudentSession(joinCode: string) {
   const db = await admin();
   const { data } = await db
     .from("sessions")
-    .select("id,title,roll_format,roll_regex,is_open")
+    .select("id,title,roll_format,roll_regex,is_open,geo_lat,geo_lng,geo_radius_m")
     .eq("join_code", joinCode)
     .maybeSingle();
   if (!data) return { db, session: null };
@@ -55,23 +70,62 @@ async function requireStudentSession(joinCode: string) {
 }
 
 export const createSession = createServerFn({ method: "POST" })
-  .inputValidator((data: { title: string; format?: string }) => ({
-    title: str(data?.title, 120),
-    format: str(data?.format ?? "", 60),
-  }))
+  .inputValidator(
+    (data: {
+      title: string;
+      format?: string;
+      lat?: number | null;
+      lng?: number | null;
+      radiusM?: number | null;
+    }) => ({
+      title: str(data?.title, 120),
+      format: str(data?.format ?? "", 60),
+      lat: coord(data?.lat ?? null, 90),
+      lng: coord(data?.lng ?? null, 180),
+      radiusM: radius(data?.radiusM ?? null),
+    }),
+  )
   .handler(async ({ data }) => {
     if (!data.title) throw new Error("Give the session a name");
     const db = await admin();
     const teacherCode = randomCode(10);
+    const fenced = data.lat != null && data.lng != null;
     const { error } = await db.from("sessions").insert({
       title: data.title,
       join_code: randomCode(6),
       teacher_code: teacherCode,
       roll_format: data.format,
       roll_regex: data.format || null,
+      geo_lat: fenced ? data.lat : null,
+      geo_lng: fenced ? data.lng : null,
+      geo_radius_m: fenced ? (data.radiusM ?? 100) : null,
     });
     if (error) throw new Error("Could not create the session");
     return { teacherCode };
+  });
+
+/** Turn the location fence on (at the teacher's current spot) or off. */
+export const setSessionGeofence = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: { teacherCode: string; lat?: number | null; lng?: number | null; radiusM?: number | null }) => ({
+      teacherCode: str(data?.teacherCode, 32),
+      lat: coord(data?.lat ?? null, 90),
+      lng: coord(data?.lng ?? null, 180),
+      radiusM: radius(data?.radiusM ?? null),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { db, session } = await requireTeacherSession(data.teacherCode);
+    const fenced = data.lat != null && data.lng != null;
+    await db
+      .from("sessions")
+      .update({
+        geo_lat: fenced ? data.lat : null,
+        geo_lng: fenced ? data.lng : null,
+        geo_radius_m: fenced ? (data.radiusM ?? 100) : null,
+      })
+      .eq("id", session.id);
+    return { ok: true };
   });
 
 /** Public view of a session — deliberately excludes teacher_code and the row id. */
@@ -86,6 +140,9 @@ export const getStudentSession = createServerFn({ method: "POST" })
         roll_format: session.roll_format,
         roll_regex: session.roll_regex,
         is_open: session.is_open,
+        // Never expose the exact classroom coordinates — only that a fence exists.
+        requires_location: session.geo_lat != null && session.geo_lng != null,
+        geo_radius_m: session.geo_radius_m,
       },
     };
   });
@@ -99,6 +156,9 @@ export const submitAttendance = createServerFn({ method: "POST" })
       idPhoto?: string | null;
       selfie: string;
       selfieHash: string;
+      lat?: number | null;
+      lng?: number | null;
+      accuracy?: number | null;
     }) => ({
       code: str(data?.code, 16).toUpperCase(),
       rollNumber: str(data?.rollNumber, 40).toUpperCase(),
@@ -106,6 +166,9 @@ export const submitAttendance = createServerFn({ method: "POST" })
       idPhoto: optionalImage(data?.idPhoto ?? null),
       selfie: optionalImage(data?.selfie),
       selfieHash: str(data?.selfieHash, 64),
+      lat: coord(data?.lat ?? null, 90),
+      lng: coord(data?.lng ?? null, 180),
+      accuracy: data?.accuracy == null ? null : Math.max(0, Number(data.accuracy) || 0),
     }),
   )
   .handler(async ({ data }) => {
@@ -113,6 +176,25 @@ export const submitAttendance = createServerFn({ method: "POST" })
     if (!session) throw new Error("Session not found");
     if (!session.is_open) throw new Error("This session is closed");
     if (!data.rollNumber) throw new Error("A roll number is required");
+
+    // Location fence — checked on the server so it can't be skipped from the browser.
+    let distance: number | null = null;
+    if (session.geo_lat != null && session.geo_lng != null) {
+      if (data.lat == null || data.lng == null) {
+        throw new Error("This session needs your location. Allow location access and try again.");
+      }
+      distance = Math.round(
+        distanceMeters(session.geo_lat, session.geo_lng, data.lat, data.lng),
+      );
+      const allowed =
+        (session.geo_radius_m ?? 100) + Math.min(data.accuracy ?? 0, ACCURACY_TOLERANCE_M);
+      if (distance > allowed) {
+        throw new Error(
+          `You're about ${distance} m from where this session was started. You must be inside the classroom to mark attendance.`,
+        );
+      }
+    }
+
 
     const { data: existing } = await db
       .from("attendance_records")
@@ -138,6 +220,7 @@ export const submitAttendance = createServerFn({ method: "POST" })
       status: clash ? "flagged" : "present",
       flag_reason: clash ? "Selfie looks identical to another student's photo" : null,
       matched_roll: clash?.roll_number ?? null,
+      distance_m: distance,
     });
     if (error) throw new Error("Could not save your attendance. Please try again.");
 
@@ -150,7 +233,7 @@ export const getTeacherDashboard = createServerFn({ method: "POST" })
     const db = await admin();
     const { data: session } = await db
       .from("sessions")
-      .select("id,title,join_code,roll_format,is_open")
+      .select("id,title,join_code,roll_format,is_open,geo_lat,geo_lng,geo_radius_m")
       .eq("teacher_code", data.teacherCode)
       .maybeSingle();
     if (!session) return { session: null, records: [], roster: [] };

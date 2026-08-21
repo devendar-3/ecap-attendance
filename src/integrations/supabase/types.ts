@@ -17,6 +17,7 @@ export type Database = {
       attendance_records: {
         Row: {
           created_at: string
+          distance_m: number | null
           flag_reason: string | null
           id: string
           id_photo_url: string | null
@@ -30,6 +31,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          distance_m?: number | null
           flag_reason?: string | null
           id?: string
           id_photo_url?: string | null
@@ -43,6 +45,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          distance_m?: number | null
           flag_reason?: string | null
           id?: string
           id_photo_url?: string | null
@@ -100,6 +103,9 @@ export type Database = {
         Row: {
           created_at: string
           expected_count: number | null
+          geo_lat: number | null
+          geo_lng: number | null
+          geo_radius_m: number | null
           id: string
           is_open: boolean
           join_code: string
@@ -111,6 +117,9 @@ export type Database = {
         Insert: {
           created_at?: string
           expected_count?: number | null
+          geo_lat?: number | null
+          geo_lng?: number | null
+          geo_radius_m?: number | null
           id?: string
           is_open?: boolean
           join_code: string
@@ -122,6 +131,9 @@ export type Database = {
         Update: {
           created_at?: string
           expected_count?: number | null
+          geo_lat?: number | null
+          geo_lng?: number | null
+          geo_radius_m?: number | null
           id?: string
           is_open?: boolean
           join_code?: string
