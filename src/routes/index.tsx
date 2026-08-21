@@ -1,9 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ScanLine, Camera, FileDown, ShieldAlert } from "lucide-react";
+import { ScanLine, Camera, FileDown, ShieldAlert, MapPin, Loader2 } from "lucide-react";
 
 import { createSession as createSessionFn } from "@/lib/rollcall.functions";
+import { RADIUS_OPTIONS, readPosition } from "@/lib/geo";
 
 
 export const Route = createFileRoute("/")({
