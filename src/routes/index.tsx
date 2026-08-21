@@ -37,6 +37,9 @@ function Home() {
   const [creating, setCreating] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [lockLocation, setLockLocation] = useState(true);
+  const [radiusM, setRadiusM] = useState<number>(100);
+  const [locating, setLocating] = useState(false);
 
   async function createSession(e: React.FormEvent) {
     e.preventDefault();
@@ -44,8 +47,30 @@ function Home() {
     if (!title.trim()) return setError("Give the session a name");
     setCreating(true);
     try {
+      let here: { lat: number; lng: number } | null = null;
+      if (lockLocation) {
+        setLocating(true);
+        try {
+          const pos = await readPosition();
+          here = { lat: pos.lat, lng: pos.lng };
+        } catch (err) {
+          setCreating(false);
+          setLocating(false);
+          return setError(
+            `${err instanceof Error ? err.message : "Could not read your location."} You can also turn the classroom fence off.`,
+          );
+        } finally {
+          setLocating(false);
+        }
+      }
       const { teacherCode } = await runCreateSession({
-        data: { title: title.trim(), format: format.trim() },
+        data: {
+          title: title.trim(),
+          format: format.trim(),
+          lat: here?.lat ?? null,
+          lng: here?.lng ?? null,
+          radiusM: here ? radiusM : null,
+        },
       });
       navigate({ to: "/t/$teacherCode", params: { teacherCode } });
     } catch {
