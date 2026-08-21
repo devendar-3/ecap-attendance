@@ -32,12 +32,26 @@ async function admin() {
   return supabaseAdmin;
 }
 
+function coord(value: unknown, limit: number): number | null {
+  if (value == null) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n) || Math.abs(n) > limit) throw new Error("Invalid location");
+  return n;
+}
+
+function radius(value: unknown): number | null {
+  if (value == null) return null;
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 20 || n > 5000) throw new Error("Invalid radius");
+  return n;
+}
+
 /** Resolves the session behind a teacher code, or throws. */
 async function requireTeacherSession(teacherCode: string) {
   const db = await admin();
   const { data } = await db
     .from("sessions")
-    .select("id,title,join_code,roll_format,is_open")
+    .select("id,title,join_code,roll_format,is_open,geo_lat,geo_lng,geo_radius_m")
     .eq("teacher_code", teacherCode)
     .maybeSingle();
   if (!data) throw new Error("Not found");
@@ -48,7 +62,7 @@ async function requireStudentSession(joinCode: string) {
   const db = await admin();
   const { data } = await db
     .from("sessions")
-    .select("id,title,roll_format,roll_regex,is_open")
+    .select("id,title,roll_format,roll_regex,is_open,geo_lat,geo_lng,geo_radius_m")
     .eq("join_code", joinCode)
     .maybeSingle();
   if (!data) return { db, session: null };
@@ -56,23 +70,62 @@ async function requireStudentSession(joinCode: string) {
 }
 
 export const createSession = createServerFn({ method: "POST" })
-  .inputValidator((data: { title: string; format?: string }) => ({
-    title: str(data?.title, 120),
-    format: str(data?.format ?? "", 60),
-  }))
+  .inputValidator(
+    (data: {
+      title: string;
+      format?: string;
+      lat?: number | null;
+      lng?: number | null;
+      radiusM?: number | null;
+    }) => ({
+      title: str(data?.title, 120),
+      format: str(data?.format ?? "", 60),
+      lat: coord(data?.lat ?? null, 90),
+      lng: coord(data?.lng ?? null, 180),
+      radiusM: radius(data?.radiusM ?? null),
+    }),
+  )
   .handler(async ({ data }) => {
     if (!data.title) throw new Error("Give the session a name");
     const db = await admin();
     const teacherCode = randomCode(10);
+    const fenced = data.lat != null && data.lng != null;
     const { error } = await db.from("sessions").insert({
       title: data.title,
       join_code: randomCode(6),
       teacher_code: teacherCode,
       roll_format: data.format,
       roll_regex: data.format || null,
+      geo_lat: fenced ? data.lat : null,
+      geo_lng: fenced ? data.lng : null,
+      geo_radius_m: fenced ? (data.radiusM ?? 100) : null,
     });
     if (error) throw new Error("Could not create the session");
     return { teacherCode };
+  });
+
+/** Turn the location fence on (at the teacher's current spot) or off. */
+export const setSessionGeofence = createServerFn({ method: "POST" })
+  .inputValidator(
+    (data: { teacherCode: string; lat?: number | null; lng?: number | null; radiusM?: number | null }) => ({
+      teacherCode: str(data?.teacherCode, 32),
+      lat: coord(data?.lat ?? null, 90),
+      lng: coord(data?.lng ?? null, 180),
+      radiusM: radius(data?.radiusM ?? null),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const { db, session } = await requireTeacherSession(data.teacherCode);
+    const fenced = data.lat != null && data.lng != null;
+    await db
+      .from("sessions")
+      .update({
+        geo_lat: fenced ? data.lat : null,
+        geo_lng: fenced ? data.lng : null,
+        geo_radius_m: fenced ? (data.radiusM ?? 100) : null,
+      })
+      .eq("id", session.id);
+    return { ok: true };
   });
 
 /** Public view of a session — deliberately excludes teacher_code and the row id. */
