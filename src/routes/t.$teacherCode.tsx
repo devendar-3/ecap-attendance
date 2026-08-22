@@ -284,6 +284,46 @@ function TeacherDashboard() {
         </label>
       </section>
 
+      <section className="panel mt-4 flex flex-wrap items-center justify-between gap-4 p-5">
+        <div className="flex items-start gap-3">
+          <MapPin className={`mt-0.5 size-5 ${session.geo_lat != null ? "text-success" : "text-muted-foreground"}`} />
+          <div>
+            <p className="text-sm font-medium">
+              {session.geo_lat != null ? "Classroom lock is on" : "Classroom lock is off"}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {session.geo_lat != null
+                ? `Only devices within ${session.geo_radius_m ?? 100} m of the spot you locked can mark attendance — sharing the link outside the room won't work.`
+                : "Anyone with the link can mark attendance from anywhere. Lock it to your current spot to stop proxy attendance."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          {session.geo_lat == null && (
+            <select
+              value={session.geo_radius_m ?? 100}
+              onChange={(e) => void toggleFence(true, Number(e.target.value))}
+              className="rounded-md border border-input bg-background px-2 py-2 text-xs"
+              disabled={fenceBusy}
+            >
+              {RADIUS_OPTIONS.map((r) => (
+                <option key={r} value={r}>
+                  Lock within {r} m
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            onClick={() => void toggleFence(session.geo_lat == null, session.geo_radius_m ?? 100)}
+            disabled={fenceBusy}
+            className="flex items-center gap-2 rounded-lg border border-input px-3 py-2 text-sm font-medium disabled:opacity-60"
+          >
+            {fenceBusy && <Loader2 className="size-4 animate-spin" />}
+            {session.geo_lat != null ? "Turn off lock" : "Lock to my location"}
+          </button>
+        </div>
+      </section>
+
       {notice && <p className="mt-3 text-sm text-muted-foreground">{notice}</p>}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-4">
