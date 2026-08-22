@@ -306,7 +306,6 @@ function TeacherDashboard() {
               className="rounded-md border border-input bg-background px-2 py-2 text-xs"
               disabled={fenceBusy}
             >
-              <option value="">Lock within…</option>
               {RADIUS_OPTIONS.map((r) => (
                 <option key={r} value={r}>
                   Lock within {r} m
