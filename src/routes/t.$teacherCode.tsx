@@ -24,7 +24,8 @@ import {
   setSessionOpen,
   setSessionGeofence,
 } from "@/lib/rollcall.functions";
-import { RADIUS_OPTIONS, readPosition } from "@/lib/geo";
+import { DEFAULT_RADIUS_M, readPosition } from "@/lib/geo";
+import { RadiusPicker } from "@/components/RadiusPicker";
 import { fileToDataUrl } from "@/lib/imaging";
 import { downloadFile, toCsv } from "@/lib/session";
 
@@ -84,6 +85,7 @@ function TeacherDashboard() {
   const runSetOpen = useServerFn(setSessionOpen);
   const runSetGeofence = useServerFn(setSessionGeofence);
   const [fenceBusy, setFenceBusy] = useState(false);
+  const [pendingRadius, setPendingRadius] = useState<number>(DEFAULT_RADIUS_M);
 
   const [session, setSession] = useState<SessionRow | null>(null);
   const [records, setRecords] = useState<Record_[]>([]);
@@ -293,28 +295,17 @@ function TeacherDashboard() {
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {session.geo_lat != null
-                ? `Only devices within ${session.geo_radius_m ?? 100} m of the spot you locked can mark attendance — sharing the link outside the room won't work.`
+                ? `Only devices within ${session.geo_radius_m ?? DEFAULT_RADIUS_M} m of the spot you locked can mark attendance — sharing the link outside the room won't work.`
                 : "Anyone with the link can mark attendance from anywhere. Lock it to your current spot to stop proxy attendance."}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {session.geo_lat == null && (
-            <select
-              value={session.geo_radius_m ?? 100}
-              onChange={(e) => void toggleFence(true, Number(e.target.value))}
-              className="rounded-md border border-input bg-background px-2 py-2 text-xs"
-              disabled={fenceBusy}
-            >
-              {RADIUS_OPTIONS.map((r) => (
-                <option key={r} value={r}>
-                  Lock within {r} m
-                </option>
-              ))}
-            </select>
+            <RadiusPicker value={pendingRadius} onChange={setPendingRadius} disabled={fenceBusy} />
           )}
           <button
-            onClick={() => void toggleFence(session.geo_lat == null, session.geo_radius_m ?? 100)}
+            onClick={() => void toggleFence(session.geo_lat == null, pendingRadius)}
             disabled={fenceBusy}
             className="flex items-center gap-2 rounded-lg border border-input px-3 py-2 text-sm font-medium disabled:opacity-60"
           >
