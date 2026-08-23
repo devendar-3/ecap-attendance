@@ -4,7 +4,8 @@ import { useServerFn } from "@tanstack/react-start";
 import { ScanLine, Camera, FileDown, ShieldAlert, MapPin, Loader2 } from "lucide-react";
 
 import { createSession as createSessionFn } from "@/lib/rollcall.functions";
-import { RADIUS_OPTIONS, readPosition } from "@/lib/geo";
+import { DEFAULT_RADIUS_M, readPosition } from "@/lib/geo";
+import { RadiusPicker } from "@/components/RadiusPicker";
 
 
 export const Route = createFileRoute("/")({
@@ -38,7 +39,7 @@ function Home() {
   const [joinCode, setJoinCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [lockLocation, setLockLocation] = useState(true);
-  const [radiusM, setRadiusM] = useState<number>(100);
+  const [radiusM, setRadiusM] = useState<number>(DEFAULT_RADIUS_M);
   const [locating, setLocating] = useState(false);
 
   async function createSession(e: React.FormEvent) {
@@ -150,22 +151,11 @@ function Home() {
                 </span>
               </label>
               {lockLocation && (
-                <div className="mt-3 flex items-center gap-2 pl-7">
+                <div className="mt-3 flex flex-wrap items-center gap-2 pl-7">
                   <label htmlFor="radius" className="text-xs text-muted-foreground">
                     Allowed distance
                   </label>
-                  <select
-                    id="radius"
-                    value={radiusM}
-                    onChange={(e) => setRadiusM(Number(e.target.value))}
-                    className="rounded-md border border-input bg-background px-2 py-1.5 text-xs"
-                  >
-                    {RADIUS_OPTIONS.map((r) => (
-                      <option key={r} value={r}>
-                        {r} m
-                      </option>
-                    ))}
-                  </select>
+                  <RadiusPicker value={radiusM} onChange={setRadiusM} />
                 </div>
               )}
             </div>

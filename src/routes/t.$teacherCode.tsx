@@ -24,7 +24,8 @@ import {
   setSessionOpen,
   setSessionGeofence,
 } from "@/lib/rollcall.functions";
-import { RADIUS_OPTIONS, readPosition } from "@/lib/geo";
+import { DEFAULT_RADIUS_M, readPosition } from "@/lib/geo";
+import { RadiusPicker } from "@/components/RadiusPicker";
 import { fileToDataUrl } from "@/lib/imaging";
 import { downloadFile, toCsv } from "@/lib/session";
 
@@ -300,18 +301,7 @@ function TeacherDashboard() {
         </div>
         <div className="flex items-center gap-2">
           {session.geo_lat == null && (
-            <select
-              value={session.geo_radius_m ?? 100}
-              onChange={(e) => void toggleFence(true, Number(e.target.value))}
-              className="rounded-md border border-input bg-background px-2 py-2 text-xs"
-              disabled={fenceBusy}
-            >
-              {RADIUS_OPTIONS.map((r) => (
-                <option key={r} value={r}>
-                  Lock within {r} m
-                </option>
-              ))}
-            </select>
+            <RadiusPicker value={pendingRadius} onChange={setPendingRadius} disabled={fenceBusy} />
           )}
           <button
             onClick={() => void toggleFence(session.geo_lat == null, session.geo_radius_m ?? 100)}
