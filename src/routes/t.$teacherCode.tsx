@@ -295,7 +295,7 @@ function TeacherDashboard() {
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {session.geo_lat != null
-                ? `Only devices within ${session.geo_radius_m ?? 100} m of the spot you locked can mark attendance — sharing the link outside the room won't work.`
+                ? `Only devices within ${session.geo_radius_m ?? DEFAULT_RADIUS_M} m of the spot you locked can mark attendance — sharing the link outside the room won't work.`
                 : "Anyone with the link can mark attendance from anywhere. Lock it to your current spot to stop proxy attendance."}
             </p>
           </div>
@@ -305,7 +305,7 @@ function TeacherDashboard() {
             <RadiusPicker value={pendingRadius} onChange={setPendingRadius} disabled={fenceBusy} />
           )}
           <button
-            onClick={() => void toggleFence(session.geo_lat == null, session.geo_radius_m ?? 100)}
+            onClick={() => void toggleFence(session.geo_lat == null, pendingRadius)}
             disabled={fenceBusy}
             className="flex items-center gap-2 rounded-lg border border-input px-3 py-2 text-sm font-medium disabled:opacity-60"
           >
