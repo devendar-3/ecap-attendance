@@ -18,7 +18,19 @@ export function distanceMeters(
 /** GPS accuracy we are willing to forgive when checking the fence, in metres. */
 export const ACCURACY_TOLERANCE_M = 75;
 
-export const RADIUS_OPTIONS = [50, 100, 200, 500] as const;
+export const MIN_RADIUS_M = 5;
+export const MAX_RADIUS_M = 5000;
+
+/** Presets sized to real rooms — 100 m covers a whole building, so it is not the default. */
+export const RADIUS_OPTIONS = [
+  { value: 10, label: "10 m — one classroom" },
+  { value: 20, label: "20 m — large classroom / lab" },
+  { value: 40, label: "40 m — lecture hall" },
+  { value: 75, label: "75 m — floor / wing" },
+  { value: 150, label: "150 m — whole building" },
+] as const;
+
+export const DEFAULT_RADIUS_M = 20;
 
 export function readPosition(): Promise<{ lat: number; lng: number; accuracy: number }> {
   return new Promise((resolve, reject) => {

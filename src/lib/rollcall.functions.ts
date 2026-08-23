@@ -42,7 +42,7 @@ function coord(value: unknown, limit: number): number | null {
 function radius(value: unknown): number | null {
   if (value == null) return null;
   const n = Math.round(Number(value));
-  if (!Number.isFinite(n) || n < 20 || n > 5000) throw new Error("Invalid radius");
+  if (!Number.isFinite(n) || n < 5 || n > 5000) throw new Error("Invalid radius");
   return n;
 }
 
@@ -98,7 +98,7 @@ export const createSession = createServerFn({ method: "POST" })
       roll_regex: data.format || null,
       geo_lat: fenced ? data.lat : null,
       geo_lng: fenced ? data.lng : null,
-      geo_radius_m: fenced ? (data.radiusM ?? 100) : null,
+      geo_radius_m: fenced ? (data.radiusM ?? 20) : null,
     });
     if (error) throw new Error("Could not create the session");
     return { teacherCode };
@@ -122,7 +122,7 @@ export const setSessionGeofence = createServerFn({ method: "POST" })
       .update({
         geo_lat: fenced ? data.lat : null,
         geo_lng: fenced ? data.lng : null,
-        geo_radius_m: fenced ? (data.radiusM ?? 100) : null,
+        geo_radius_m: fenced ? (data.radiusM ?? 20) : null,
       })
       .eq("id", session.id);
     return { ok: true };
@@ -187,7 +187,7 @@ export const submitAttendance = createServerFn({ method: "POST" })
         distanceMeters(session.geo_lat, session.geo_lng, data.lat, data.lng),
       );
       const allowed =
-        (session.geo_radius_m ?? 100) + Math.min(data.accuracy ?? 0, ACCURACY_TOLERANCE_M);
+        (session.geo_radius_m ?? 20) + Math.min(data.accuracy ?? 0, ACCURACY_TOLERANCE_M);
       if (distance > allowed) {
         throw new Error(
           `You're about ${distance} m from where this session was started. You must be inside the classroom to mark attendance.`,
