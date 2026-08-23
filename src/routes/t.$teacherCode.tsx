@@ -85,6 +85,7 @@ function TeacherDashboard() {
   const runSetOpen = useServerFn(setSessionOpen);
   const runSetGeofence = useServerFn(setSessionGeofence);
   const [fenceBusy, setFenceBusy] = useState(false);
+  const [pendingRadius, setPendingRadius] = useState<number>(DEFAULT_RADIUS_M);
 
   const [session, setSession] = useState<SessionRow | null>(null);
   const [records, setRecords] = useState<Record_[]>([]);
