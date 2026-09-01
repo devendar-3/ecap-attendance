@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { requestCreatorAccess } from "./access.server";
 
 function text(value: unknown, max: number) {
   if (typeof value !== "string") throw new Error("Invalid input");
@@ -21,15 +20,15 @@ export const requestAccess = createServerFn({ method: "POST" })
     name: text(data?.name, 120),
     email: email(data?.email),
   }))
-  .handler(({ data }) => requestCreatorAccess(data.name, data.email));
+  .handler(async ({ data }) => {
+    const { requestCreatorAccess } = await import("./access.server");
+    return requestCreatorAccess(data.name, data.email);
+  });
 
 export const getCreatorAccessState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const {
-      getCreatorAccess,
-      getUserEmail,
-    } = await import("./access.server");
+    const { getCreatorAccess, getUserEmail } = await import("./access.server");
     const userEmail = await getUserEmail(context.supabase);
     return getCreatorAccess(context.userId, userEmail);
   });

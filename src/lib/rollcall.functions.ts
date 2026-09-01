@@ -4,7 +4,6 @@ import { hammingDistance, DUPLICATE_THRESHOLD } from "./imaging";
 import { ACCURACY_TOLERANCE_M, distanceMeters } from "./geo";
 import { randomCode } from "./session";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { getUserEmail, requireSessionCreator } from "./access.server";
 
 /**
  * All database access for RollCall runs here. The tables are locked down (no
@@ -90,6 +89,7 @@ export const createSession = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     if (!data.title) throw new Error("Give the session a name");
+    const { getUserEmail, requireSessionCreator } = await import("./access.server");
     const creatorEmail = await getUserEmail(context.supabase);
     await requireSessionCreator(context.userId, creatorEmail);
     const db = await admin();
