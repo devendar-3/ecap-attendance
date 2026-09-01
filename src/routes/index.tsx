@@ -1,11 +1,13 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { ScanLine, Camera, FileDown, ShieldAlert, MapPin, Loader2 } from "lucide-react";
+import { ScanLine, Camera, FileDown, ShieldAlert, MapPin, Loader2, Mail, LogIn } from "lucide-react";
 
 import { createSession as createSessionFn } from "@/lib/rollcall.functions";
+import { getCreatorAccessState, requestAccess } from "@/lib/access.functions";
 import { DEFAULT_RADIUS_M, readPosition } from "@/lib/geo";
 import { RadiusPicker } from "@/components/RadiusPicker";
+import { supabase } from "@/integrations/supabase/client";
 
 
 export const Route = createFileRoute("/")({
@@ -33,6 +35,8 @@ export const Route = createFileRoute("/")({
 function Home() {
   const navigate = useNavigate();
   const runCreateSession = useServerFn(createSessionFn);
+  const runGetAccess = useServerFn(getCreatorAccessState);
+  const runRequestAccess = useServerFn(requestAccess);
   const [title, setTitle] = useState("");
   const [format, setFormat] = useState("");
   const [creating, setCreating] = useState(false);
@@ -41,6 +45,49 @@ function Home() {
   const [lockLocation, setLockLocation] = useState(true);
   const [radiusM, setRadiusM] = useState<number>(DEFAULT_RADIUS_M);
   const [locating, setLocating] = useState(false);
+  const [signedIn, setSignedIn] = useState(false);
+  const [accessStatus, setAccessStatus] = useState<"approved" | "rejected" | "revoked" | "pending" | null>(null);
+  const [accessName, setAccessName] = useState("");
+  const [accessEmail, setAccessEmail] = useState("");
+  const [accessBusy, setAccessBusy] = useState(false);
+  const [accessMessage, setAccessMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!active) return;
+      if (!data.user) {
+        setSignedIn(false);
+        return;
+      }
+      setSignedIn(true);
+      try {
+        const state = await runGetAccess();
+        if (active) setAccessStatus(state.status);
+      } catch {
+        if (active) setAccessStatus(null);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [runGetAccess]);
+
+  async function submitAccessRequest(event: React.FormEvent) {
+    event.preventDefault();
+    setAccessBusy(true);
+    setAccessMessage(null);
+    try {
+      await runRequestAccess({ data: { name: accessName, email: accessEmail } });
+      setAccessMessage("Access request sent to administrator. You can create sessions after your request is approved.");
+      setAccessName("");
+      setAccessEmail("");
+    } catch (requestError) {
+      setAccessMessage(requestError instanceof Error ? requestError.message : "Could not send the access request");
+    } finally {
+      setAccessBusy(false);
+    }
+  }
 
   async function createSession(e: React.FormEvent) {
     e.preventDefault();
@@ -100,8 +147,66 @@ function Home() {
 
       <div className="grid gap-6 md:grid-cols-5">
         <section className="panel md:col-span-3 p-6 sm:p-8">
-          <h2 className="text-xl font-semibold">Create a session</h2>
-          <p className="mt-1 text-sm text-muted-foreground">You get a teacher dashboard and a student code.</p>
+          {!signedIn || accessStatus !== "approved" ? (
+            <>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Request creator access</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">Get permission to create attendance sessions.</p>
+                </div>
+                <Mail className="size-5 shrink-0 text-accent" />
+              </div>
+              {signedIn ? (
+                <div className="mt-6 rounded-lg border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                  {accessStatus === "pending" && "Your request is awaiting administrator approval."}
+                  {accessStatus === "rejected" && "Your request was not approved. You can send a new request below."}
+                  {accessStatus === "revoked" && "Your creator access was revoked. Contact the administrator to request access again."}
+                  {!accessStatus && "We could not check your creator access right now."}
+                </div>
+              ) : null}
+              <form onSubmit={submitAccessRequest} className="mt-6 space-y-4">
+                <div>
+                  <label htmlFor="access-name" className="text-sm font-medium">Name</label>
+                  <input
+                    id="access-name"
+                    required
+                    value={accessName}
+                    onChange={(event) => setAccessName(event.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="access-email" className="text-sm font-medium">Email</label>
+                  <input
+                    id="access-email"
+                    type="email"
+                    required
+                    value={accessEmail}
+                    onChange={(event) => setAccessEmail(event.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
+                {accessMessage && <p className="text-sm text-muted-foreground">{accessMessage}</p>}
+                <button type="submit" disabled={accessBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+                  {accessBusy && <Loader2 className="size-4 animate-spin" />}
+                  Request Access
+                </button>
+              </form>
+              {!signedIn && (
+                <Link to="/auth" className="mt-4 flex items-center justify-center gap-2 text-sm font-medium text-accent-foreground hover:underline">
+                  <LogIn className="size-4" /> Already approved? Sign in
+                </Link>
+              )}
+            </>
+          ) : (
+          <>
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="text-xl font-semibold">Create a session</h2>
+              <p className="mt-1 text-sm text-muted-foreground">You get a teacher dashboard and a student code.</p>
+            </div>
+            <Link to="/admin" className="text-sm font-medium text-accent-foreground hover:underline">Admin</Link>
+          </div>
           <form onSubmit={createSession} className="mt-6 space-y-5">
             <div>
               <label htmlFor="title" className="text-sm font-medium">
@@ -169,6 +274,8 @@ function Home() {
               {locating ? "Getting your location…" : creating ? "Creating…" : "Create session"}
             </button>
           </form>
+          </>
+          )}
         </section>
 
         <section className="panel md:col-span-2 p-6 sm:p-8">
