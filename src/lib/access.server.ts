@@ -45,11 +45,14 @@ export async function getCreatorAccess(userId: string, email: string) {
     .from("access_requests")
     .select("status")
     .eq("email", email)
-    .in("status", ["approved", "revoked"])
+    .in("status", ["approved", "rejected", "revoked"])
     .order("updated_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  return { status: (data?.status ?? "pending") as "approved" | "revoked" | "pending", isAdmin: false };
+  return {
+    status: (data?.status ?? "pending") as "approved" | "rejected" | "revoked" | "pending",
+    isAdmin: false,
+  };
 }
 
 export async function requireSessionCreator(userId: string, email: string) {
@@ -76,6 +79,16 @@ export async function bootstrapInitialAdmin(userId: string) {
   const { error } = await db.from("user_roles").insert({ user_id: userId, role: "admin" });
   if (error) throw new Error("Could not activate administrator access");
   return { ok: true };
+}
+
+export async function getAdminSetupState() {
+  const db = await getAdminDb();
+  const { count, error } = await db
+    .from("user_roles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin");
+  if (error) throw new Error("Could not verify administrator setup");
+  return { hasAdmin: (count ?? 0) > 0 };
 }
 
 export async function getAdminDashboard(userId: string) {

@@ -40,6 +40,11 @@ export const bootstrapAdmin = createServerFn({ method: "POST" })
     return bootstrapInitialAdmin(context.userId);
   });
 
+export const getAdminSetup = createServerFn({ method: "GET" }).handler(async () => {
+  const { getAdminSetupState } = await import("./access.server");
+  return getAdminSetupState();
+});
+
 export const getAdminRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
