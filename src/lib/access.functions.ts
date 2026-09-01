@@ -1,14 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import {
-  bootstrapInitialAdmin,
-  getAdminDashboard,
-  getCreatorAccess,
-  getUserEmail,
-  requestCreatorAccess,
-  reviewCreatorAccess,
-} from "./access.server";
+import { requestCreatorAccess } from "./access.server";
 
 function text(value: unknown, max: number) {
   if (typeof value !== "string") throw new Error("Invalid input");
@@ -33,17 +26,27 @@ export const requestAccess = createServerFn({ method: "POST" })
 export const getCreatorAccessState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const {
+      getCreatorAccess,
+      getUserEmail,
+    } = await import("./access.server");
     const userEmail = await getUserEmail(context.supabase);
     return getCreatorAccess(context.userId, userEmail);
   });
 
 export const bootstrapAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .handler(({ context }) => bootstrapInitialAdmin(context.userId));
+  .handler(async ({ context }) => {
+    const { bootstrapInitialAdmin } = await import("./access.server");
+    return bootstrapInitialAdmin(context.userId);
+  });
 
 export const getAdminRequests = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(({ context }) => getAdminDashboard(context.userId));
+  .handler(async ({ context }) => {
+    const { getAdminDashboard } = await import("./access.server");
+    return getAdminDashboard(context.userId);
+  });
 
 export const updateAccessRequest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -52,4 +55,7 @@ export const updateAccessRequest = createServerFn({ method: "POST" })
     if (!["approved", "rejected", "revoked"].includes(data?.decision)) throw new Error("Invalid decision");
     return { requestId, decision: data.decision };
   })
-  .handler(({ data, context }) => reviewCreatorAccess(context.userId, data.requestId, data.decision));
+  .handler(async ({ data, context }) => {
+    const { reviewCreatorAccess } = await import("./access.server");
+    return reviewCreatorAccess(context.userId, data.requestId, data.decision);
+  });
