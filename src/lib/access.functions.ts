@@ -41,25 +41,36 @@ export const bootstrapAdmin = createServerFn({ method: "POST" })
   });
 
 export const getAdminSetup = createServerFn({ method: "GET" }).handler(async () => {
-  const { getAdminSetupState } = await import("./access.server");
-  return getAdminSetupState();
+  const { getAdminSessionState } = await import("./access.server");
+  return getAdminSessionState();
+});
+
+export const adminLogin = createServerFn({ method: "POST" })
+  .inputValidator((data: { password: string }) => ({ password: text(data?.password, 200) }))
+  .handler(async ({ data }) => {
+    const { adminLogin: login } = await import("./access.server");
+    return login(data.password);
+  });
+
+export const adminLogout = createServerFn({ method: "POST" }).handler(async () => {
+  const { adminLogout: logout } = await import("./access.server");
+  return logout();
 });
 
 export const getAdminRequests = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { getAdminDashboard } = await import("./access.server");
-    return getAdminDashboard(context.userId);
+    void context;
+    const { getAdminDashboardWithPassword } = await import("./access.server");
+    return getAdminDashboardWithPassword();
   });
 
 export const updateAccessRequest = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((data: { requestId: string; decision: "approved" | "rejected" | "revoked" }) => {
     const requestId = text(data?.requestId, 64);
     if (!["approved", "rejected", "revoked"].includes(data?.decision)) throw new Error("Invalid decision");
     return { requestId, decision: data.decision };
   })
-  .handler(async ({ data, context }) => {
-    const { reviewCreatorAccess } = await import("./access.server");
-    return reviewCreatorAccess(context.userId, data.requestId, data.decision);
+  .handler(async ({ data }) => {
+    const { reviewCreatorAccessWithPassword } = await import("./access.server");
+    return reviewCreatorAccessWithPassword(data.requestId, data.decision);
   });
