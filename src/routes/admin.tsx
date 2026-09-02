@@ -11,7 +11,7 @@ import {
   updateAccessRequest,
 } from "@/lib/access.functions";
 
-export const Route = createFileRoute("/_authenticated/admin")({
+export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
       { title: "Admin approvals — RollCall" },
