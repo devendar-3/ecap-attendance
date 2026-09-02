@@ -1,11 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Check, Clock3, Loader2, LogOut, ShieldAlert, X } from "lucide-react";
+import { Check, Clock3, KeyRound, Loader2, LogOut, ShieldAlert, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
-import { supabase } from "@/integrations/supabase/client";
 import {
-  bootstrapAdmin,
+  adminLogin,
+  adminLogout,
   getAdminRequests,
   getAdminSetup,
   updateAccessRequest,
@@ -37,14 +37,17 @@ type RequestRow = {
 
 function AdminDashboard() {
   const navigate = useNavigate();
+  const runLogin = useServerFn(adminLogin);
+  const runLogout = useServerFn(adminLogout);
   const runSetup = useServerFn(getAdminSetup);
-  const runBootstrap = useServerFn(bootstrapAdmin);
   const runRequests = useServerFn(getAdminRequests);
   const runUpdate = useServerFn(updateAccessRequest);
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [setupAvailable, setSetupAvailable] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [password, setPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -53,15 +56,14 @@ function AdminDashboard() {
     setNotice(null);
     try {
       const setup = await runSetup();
-      setSetupAvailable(!setup.hasAdmin);
-      if (setup.hasAdmin) {
+        setIsAdmin(setup.isAdmin);
+        if (setup.isAdmin) {
         const result = await runRequests();
         setRequests((result.requests as RequestRow[]) ?? []);
-        setIsAdmin(true);
       }
     } catch (error) {
       setIsAdmin(false);
-      if (setupAvailable) setNotice(error instanceof Error ? error.message : "Could not load admin access");
+        setNotice(error instanceof Error ? error.message : "Could not load admin access");
     } finally {
       setLoading(false);
     }
@@ -71,16 +73,22 @@ function AdminDashboard() {
     void load();
   }, []);
 
-  async function claimAdmin() {
-    setBusyId("bootstrap");
-    setNotice(null);
+  async function signIn(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginBusy(true);
+    setLoginError(null);
     try {
-      await runBootstrap();
+      const result = await runLogin({ data: { password } });
+      if (!result.ok) {
+        setLoginError("That password was not accepted.");
+        return;
+      }
+      setPassword("");
       await load();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not activate admin access");
+      setLoginError(error instanceof Error ? error.message : "Could not sign in");
     } finally {
-      setBusyId(null);
+      setLoginBusy(false);
     }
   }
 
@@ -98,44 +106,43 @@ function AdminDashboard() {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
-    await navigate({ to: "/auth", replace: true });
+    await runLogout();
+    await navigate({ to: "/admin", replace: true });
   }
 
   if (loading) {
     return <main className="flex min-h-screen items-center justify-center"><Loader2 className="size-6 animate-spin text-muted-foreground" /></main>;
   }
 
-  if (!isAdmin && setupAvailable) {
-    return (
-      <main className="mx-auto flex min-h-screen w-full max-w-xl items-center px-5 py-12">
-        <section className="panel w-full p-6 sm:p-8">
-          <ShieldAlert className="size-8 text-accent" />
-          <h1 className="mt-4 text-2xl font-bold">Set up the administrator</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            This is the one-time setup for the existing signed-in account. Once claimed, only this administrator can approve or revoke creator access.
-          </p>
-          <button
-            onClick={() => void claimAdmin()}
-            disabled={busyId === "bootstrap"}
-            className="mt-6 flex items-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
-          >
-            {busyId === "bootstrap" && <Loader2 className="size-4 animate-spin" />}
-            Claim administrator access
-          </button>
-          {notice && <p className="mt-4 text-sm text-destructive">{notice}</p>}
-        </section>
-      </main>
-    );
-  }
-
   if (!isAdmin) {
     return (
-      <main className="mx-auto max-w-md px-5 py-24 text-center">
-        <ShieldAlert className="mx-auto size-8 text-destructive" />
-        <h1 className="mt-4 text-2xl font-bold">Administrator access required</h1>
-        <p className="mt-2 text-sm text-muted-foreground">This account is not authorized to view approvals.</p>
-        <Link to="/" className="mt-6 inline-block rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground">Back home</Link>
+      <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-5 py-12">
+        <section className="panel w-full p-6 sm:p-8">
+          <KeyRound className="size-8 text-accent" />
+          <p className="mt-4 text-xs font-medium tracking-wide text-muted-foreground uppercase">RollCall administration</p>
+          <h1 className="mt-1 text-2xl font-bold">Admin login</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Sign in to review requests and manage who can create sessions.</p>
+          <form onSubmit={signIn} className="mt-6 space-y-4">
+            <div>
+              <label htmlFor="admin-password" className="text-sm font-medium">Password</label>
+              <input
+                id="admin-password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
+            {loginError && <p className="text-sm text-destructive">{loginError}</p>}
+            <button type="submit" disabled={loginBusy} className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60">
+              {loginBusy && <Loader2 className="size-4 animate-spin" />}
+              {loginBusy ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
+          <Link to="/" className="mt-5 block text-center text-sm text-muted-foreground hover:text-foreground">Back to RollCall</Link>
+        </section>
       </main>
     );
   }

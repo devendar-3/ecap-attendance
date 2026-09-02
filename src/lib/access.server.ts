@@ -1,6 +1,53 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createHash, timingSafeEqual } from "node:crypto";
+import { useSession } from "@tanstack/react-start/server";
 
 type AccessDecision = "approved" | "rejected" | "revoked";
+type AdminSession = { isAdmin?: boolean };
+
+function adminSessionConfig() {
+  const password = process.env["SESSION_SECRET"];
+  if (!password) throw new Error("Admin session is not configured");
+  return {
+    password,
+    name: "rollcall-admin",
+    maxAge: 60 * 60 * 8,
+    cookie: { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" },
+  };
+}
+
+function passwordMatches(input: string, expected: string) {
+  const inputHash = createHash("sha256").update(input, "utf8").digest();
+  const expectedHash = createHash("sha256").update(expected, "utf8").digest();
+  return timingSafeEqual(inputHash, expectedHash);
+}
+
+export async function adminLogin(password: string) {
+  const expected = process.env["SITE_PASSWORD"];
+  if (!expected) throw new Error("Admin login is not configured");
+  if (!passwordMatches(password, expected)) return { ok: false as const };
+
+  const session = await useSession<AdminSession>(adminSessionConfig());
+  await session.update({ isAdmin: true });
+  return { ok: true as const };
+}
+
+export async function getAdminSessionState() {
+  const session = await useSession<AdminSession>(adminSessionConfig());
+  return { isAdmin: Boolean(session.data.isAdmin) };
+}
+
+export async function requireAdminSession() {
+  const session = await useSession<AdminSession>(adminSessionConfig());
+  if (!session.data.isAdmin) throw new Error("Administrator login required");
+  return session;
+}
+
+export async function adminLogout() {
+  const session = await useSession<AdminSession>(adminSessionConfig());
+  await session.clear();
+  return { ok: true as const };
+}
 
 async function getAdminDb() {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -102,6 +149,17 @@ export async function getAdminDashboard(userId: string) {
   return { requests: data ?? [] };
 }
 
+export async function getAdminDashboardWithPassword() {
+  await requireAdminSession();
+  const db = await getAdminDb();
+  const { data, error } = await db
+    .from("access_requests")
+    .select("id,name,email,status,created_at,reviewed_at")
+    .order("created_at", { ascending: false });
+  if (error) throw new Error("Could not load access requests");
+  return { requests: data ?? [] };
+}
+
 export async function reviewCreatorAccess(userId: string, requestId: string, decision: AccessDecision) {
   if (!(await isAdmin(userId))) throw new Error("Administrator access required");
   const db = await getAdminDb();
@@ -111,6 +169,21 @@ export async function reviewCreatorAccess(userId: string, requestId: string, dec
       status: decision,
       reviewed_at: new Date().toISOString(),
       reviewed_by: userId,
+    })
+    .eq("id", requestId);
+  if (error) throw new Error("Could not update this access request");
+  return { ok: true };
+}
+
+export async function reviewCreatorAccessWithPassword(requestId: string, decision: AccessDecision) {
+  await requireAdminSession();
+  const db = await getAdminDb();
+  const { error } = await db
+    .from("access_requests")
+    .update({
+      status: decision,
+      reviewed_at: new Date().toISOString(),
+      reviewed_by: null,
     })
     .eq("id", requestId);
   if (error) throw new Error("Could not update this access request");
