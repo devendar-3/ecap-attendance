@@ -57,12 +57,10 @@ export const adminLogout = createServerFn({ method: "POST" }).handler(async () =
   return logout();
 });
 
-export const getAdminRequests = createServerFn({ method: "GET" })
-  .handler(async ({ context }) => {
-    void context;
-    const { getAdminDashboardWithPassword } = await import("./access.server");
-    return getAdminDashboardWithPassword();
-  });
+export const getAdminRequests = createServerFn({ method: "GET" }).handler(async () => {
+  const { getAdminDashboardWithPassword } = await import("./access.server");
+  return getAdminDashboardWithPassword();
+});
 
 export const updateAccessRequest = createServerFn({ method: "POST" })
   .inputValidator((data: { requestId: string; decision: "approved" | "rejected" | "revoked" }) => {

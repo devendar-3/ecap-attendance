@@ -197,6 +197,9 @@ function Home() {
                   <LogIn className="size-4" /> Already approved? Sign in
                 </Link>
               )}
+              <Link to="/admin" className="mt-3 block text-center text-xs text-muted-foreground hover:text-foreground">
+                Administrator login
+              </Link>
             </>
           ) : (
           <>
