@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Check, Clock3, KeyRound, Loader2, LogOut, ShieldAlert, X } from "lucide-react";
+import { Check, Clock3, KeyRound, Loader2, LogOut, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
 import {
@@ -56,14 +56,14 @@ function AdminDashboard() {
     setNotice(null);
     try {
       const setup = await runSetup();
-        setIsAdmin(setup.isAdmin);
-        if (setup.isAdmin) {
+      setIsAdmin(setup.isAdmin);
+      if (setup.isAdmin) {
         const result = await runRequests();
         setRequests((result.requests as RequestRow[]) ?? []);
       }
     } catch (error) {
       setIsAdmin(false);
-        setNotice(error instanceof Error ? error.message : "Could not load admin access");
+      setNotice(error instanceof Error ? error.message : "Could not load admin access");
     } finally {
       setLoading(false);
     }
