@@ -33,6 +33,13 @@ export const getCreatorAccessState = createServerFn({ method: "GET" })
     return getCreatorAccess(context.userId, userEmail);
   });
 
+export const checkCreatorEmail = createServerFn({ method: "POST" })
+  .inputValidator((data: { email: string }) => ({ email: email(data?.email) }))
+  .handler(async ({ data }) => {
+    const { getCreatorAccessForEmail } = await import("./access.server");
+    return getCreatorAccessForEmail(data.email);
+  });
+
 export const bootstrapAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

@@ -102,6 +102,21 @@ export async function getCreatorAccess(userId: string, email: string) {
   };
 }
 
+export async function getCreatorAccessForEmail(email: string) {
+  const db = await getAdminDb();
+  const { data } = await db
+    .from("access_requests")
+    .select("status")
+    .eq("email", email)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  return {
+    status: (data?.status ?? "pending") as "approved" | "rejected" | "revoked" | "pending",
+  };
+}
+
 export async function requireSessionCreator(userId: string, email: string) {
   if (await isAdmin(userId)) return;
   const db = await getAdminDb();
