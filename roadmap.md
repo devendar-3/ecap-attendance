@@ -4,3 +4,4 @@
 - [x] Clean up in-progress edits (unused imports, handler shape, indentation)
 - [x] Always-visible Admin entry link on home page
 - [x] Verify build + end-to-end flow (request → admin login → approve → revoke)
+- [ ] Fix admin sign-in failing for the saved password and verify the session persists
