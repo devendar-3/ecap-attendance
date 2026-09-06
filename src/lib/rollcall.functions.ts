@@ -71,7 +71,6 @@ async function requireStudentSession(joinCode: string) {
 }
 
 export const createSession = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator(
     (data: {
       title: string;
@@ -87,11 +86,10 @@ export const createSession = createServerFn({ method: "POST" })
       radiusM: radius(data?.radiusM ?? null),
     }),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     if (!data.title) throw new Error("Give the session a name");
-    const { getUserEmail, requireSessionCreator } = await import("./access.server");
-    const creatorEmail = await getUserEmail(context.supabase);
-    await requireSessionCreator(context.userId, creatorEmail);
+    const { requireSessionCreator } = await import("./access.server");
+    await requireSessionCreator();
     const db = await admin();
     const teacherCode = randomCode(10);
     const fenced = data.lat != null && data.lng != null;
