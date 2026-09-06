@@ -20,6 +20,8 @@ export type Database = {
           email: string
           id: string
           name: string
+          password_hash: string | null
+          password_salt: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
@@ -30,6 +32,8 @@ export type Database = {
           email: string
           id?: string
           name: string
+          password_hash?: string | null
+          password_salt?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -40,6 +44,8 @@ export type Database = {
           email?: string
           id?: string
           name?: string
+          password_hash?: string | null
+          password_salt?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
