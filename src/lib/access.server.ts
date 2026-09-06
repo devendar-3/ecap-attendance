@@ -1,9 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { useSession } from "@tanstack/react-start/server";
 
 type AccessDecision = "approved" | "rejected" | "revoked";
 type AdminSession = { isAdmin?: boolean };
+type CreatorSession = { email?: string };
 
 function adminSessionConfig() {
   const password = process.env["SESSION_SECRET"];
@@ -16,10 +17,31 @@ function adminSessionConfig() {
   };
 }
 
+function creatorSessionConfig() {
+  const password = process.env["SESSION_SECRET"];
+  if (!password) throw new Error("Creator session is not configured");
+  return {
+    password,
+    name: "rollcall-creator",
+    maxAge: 60 * 60 * 24 * 30,
+    cookie: { httpOnly: true, secure: true, sameSite: "lax" as const, path: "/" },
+  };
+}
+
 function passwordMatches(input: string, expected: string) {
   const inputHash = createHash("sha256").update(input, "utf8").digest();
   const expectedHash = createHash("sha256").update(expected, "utf8").digest();
   return timingSafeEqual(inputHash, expectedHash);
+}
+
+function hashCreatorPassword(password: string, salt: string) {
+  return createHash("sha256").update(`${salt}:${password}`, "utf8").digest("hex");
+}
+
+function creatorPasswordMatches(password: string, salt: string, expected: string) {
+  const actual = Buffer.from(hashCreatorPassword(password, salt), "hex");
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return actual.length === expectedBuffer.length && timingSafeEqual(actual, expectedBuffer);
 }
 
 export async function adminLogin(password: string) {
@@ -71,15 +93,31 @@ export async function getUserEmail(supabase: SupabaseClient): Promise<string> {
   return data.user.email.trim().toLowerCase();
 }
 
-export async function requestCreatorAccess(name: string, email: string) {
+export async function requestCreatorAccess(name: string, email: string, password: string) {
   const db = await getAdminDb();
+  const passwordSalt = randomBytes(16).toString("hex");
+  const passwordHash = hashCreatorPassword(password, passwordSalt);
   const { error } = await db.from("access_requests").insert({
     name,
     email: email.toLowerCase(),
     status: "pending",
+    password_hash: passwordHash,
+    password_salt: passwordSalt,
   });
   if (error) {
-    if (error.code === "23505") throw new Error("An access request for this email is already pending.");
+    if (error.code === "23505") {
+      const { error: updateError } = await db
+        .from("access_requests")
+        .update({
+          name,
+          password_hash: passwordHash,
+          password_salt: passwordSalt,
+        })
+        .eq("email", email.toLowerCase())
+        .eq("status", "pending");
+      if (!updateError) return { ok: true };
+      throw new Error("An access request for this email is already pending.");
+    }
     throw new Error("Could not send the access request");
   }
   return { ok: true };
@@ -117,16 +155,63 @@ export async function getCreatorAccessForEmail(email: string) {
   };
 }
 
-export async function requireSessionCreator(userId: string, email: string) {
-  if (await isAdmin(userId)) return;
+export async function creatorLogin(email: string, password: string) {
+  const db = await getAdminDb();
+  const { data } = await db
+    .from("access_requests")
+    .select("status,password_hash,password_salt")
+    .eq("email", email)
+    .order("updated_at", { ascending: false })
+    .maybeSingle();
+  if (!data || data.status !== "approved") {
+    throw new Error(
+      data?.status === "pending"
+        ? "Your creator access request is still awaiting administrator approval."
+        : data?.status === "revoked"
+          ? "Your creator access has been revoked."
+          : "This email is not approved to create sessions.",
+    );
+  }
+  if (!data.password_hash || !data.password_salt || !creatorPasswordMatches(password, data.password_salt, data.password_hash)) {
+    throw new Error("The email or password is incorrect.");
+  }
+
+  const session = await useSession<CreatorSession>(creatorSessionConfig());
+  await session.update({ email });
+  return { ok: true as const };
+}
+
+export async function getCreatorSessionState() {
+  const session = await useSession<CreatorSession>(creatorSessionConfig());
+  if (!session.data.email) return { signedIn: false as const, status: null };
+  const access = await getCreatorAccessForEmail(session.data.email);
+  if (access.status !== "approved") {
+    await session.clear();
+    return { signedIn: false as const, status: access.status };
+  }
+  return { signedIn: true as const, status: "approved" as const, email: session.data.email };
+}
+
+export async function creatorLogout() {
+  const session = await useSession<CreatorSession>(creatorSessionConfig());
+  await session.clear();
+  return { ok: true as const };
+}
+
+export async function requireSessionCreator() {
+  const session = await useSession<CreatorSession>(creatorSessionConfig());
+  if (!session.data.email) throw new Error("Please sign in before creating a session.");
   const db = await getAdminDb();
   const { data } = await db
     .from("access_requests")
     .select("id")
-    .eq("email", email)
+    .eq("email", session.data.email)
     .eq("status", "approved")
     .maybeSingle();
-  if (!data) throw new Error("Your session-creator access has not been approved.");
+  if (!data) {
+    await session.clear();
+    throw new Error("Your session-creator access has not been approved.");
+  }
 }
 
 export async function bootstrapInitialAdmin(userId: string) {

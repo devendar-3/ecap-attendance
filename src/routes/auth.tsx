@@ -1,10 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Loader2, LogIn, ShieldCheck } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 
-import { checkCreatorEmail } from "@/lib/access.functions";
-import { supabase } from "@/integrations/supabase/client";
+import { creatorLogin } from "@/lib/access.functions";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -22,17 +21,12 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
-  const runCheckCreatorEmail = useServerFn(checkCreatorEmail);
+  const runCreatorLogin = useServerFn(creatorLogin);
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
-
-  useEffect(() => {
-    void supabase.auth.getUser().then(({ data }) => {
-      if (data.user) void navigate({ to: "/" });
-    });
-  }, [navigate]);
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
@@ -41,30 +35,8 @@ function AuthPage() {
     setSent(false);
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      const access = await runCheckCreatorEmail({ data: { email: normalizedEmail } });
-      if (access.status !== "approved") {
-        setError(
-          access.status === "pending"
-            ? "Your creator access request is still awaiting approval."
-            : access.status === "revoked"
-              ? "Your creator access has been revoked."
-              : "This email is not approved to create sessions.",
-        );
-        return;
-      }
-
-      const { error: signInError } = await supabase.auth.signInWithOtp({
-        email: normalizedEmail,
-        options: {
-          shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/`,
-        },
-      });
-      if (signInError) {
-        setError("We could not send the sign-in link. Please try again.");
-        return;
-      }
-      setSent(true);
+      await runCreatorLogin({ data: { email: normalizedEmail, password } });
+      await navigate({ to: "/" });
     } catch (signInError) {
       setError(signInError instanceof Error ? signInError.message : "Could not sign in");
     } finally {
@@ -85,7 +57,7 @@ function AuthPage() {
           </div>
         </div>
          <p className="mt-5 text-sm text-muted-foreground">
-           Enter the email approved by the administrator. We will send a secure sign-in link — no password needed.
+            Enter the email and password you submitted with your creator access request. You can sign in after approval.
          </p>
         <form className="mt-6 space-y-4" onSubmit={signIn}>
           <div>
@@ -100,19 +72,26 @@ function AuthPage() {
               className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
+          <div>
+            <label htmlFor="auth-password" className="text-sm font-medium">Password</label>
+            <input
+              id="auth-password"
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
            {error && <p className="text-sm text-destructive">{error}</p>}
-           {sent && (
-             <p className="text-sm text-success">
-               Sign-in link sent. Open it from your email to create attendance sessions.
-             </p>
-           )}
           <button
             type="submit"
             disabled={busy}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground disabled:opacity-60"
           >
             {busy ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
-             {busy ? "Sending link…" : "Email me a sign-in link"}
+             {busy ? "Signing in…" : "Sign in to create sessions"}
           </button>
         </form>
         <Link to="/" className="mt-5 block text-center text-sm text-muted-foreground hover:text-foreground">

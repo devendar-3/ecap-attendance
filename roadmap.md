@@ -6,3 +6,4 @@
 - [x] Verify build + end-to-end flow (request → admin login → approve → revoke)
 - [x] Fix admin sign-in failing for the saved password and verify the session persists
 - [x] Replace teacher password sign-in with an approved-email magic link; keep admin password login unchanged
+- [ ] Replace teacher magic link with a request password and secure approved creator sign-in

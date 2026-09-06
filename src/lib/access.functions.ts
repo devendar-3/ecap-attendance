@@ -1,7 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
 function text(value: unknown, max: number) {
   if (typeof value !== "string") throw new Error("Invalid input");
   const result = value.trim();
@@ -16,28 +14,35 @@ function email(value: unknown) {
 }
 
 export const requestAccess = createServerFn({ method: "POST" })
-  .inputValidator((data: { name: string; email: string }) => ({
+  .inputValidator((data: { name: string; email: string; password: string }) => ({
     name: text(data?.name, 120),
     email: email(data?.email),
+    password: text(data?.password, 200),
   }))
   .handler(async ({ data }) => {
     const { requestCreatorAccess } = await import("./access.server");
-    return requestCreatorAccess(data.name, data.email);
+    return requestCreatorAccess(data.name, data.email, data.password);
   });
 
 export const getCreatorAccessState = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { getCreatorAccess, getUserEmail } = await import("./access.server");
-    const userEmail = await getUserEmail(context.supabase);
-    return getCreatorAccess(context.userId, userEmail);
+  .handler(async () => {
+    const { getCreatorSessionState } = await import("./access.server");
+    return getCreatorSessionState();
   });
 
-export const checkCreatorEmail = createServerFn({ method: "POST" })
-  .inputValidator((data: { email: string }) => ({ email: email(data?.email) }))
+export const creatorLogin = createServerFn({ method: "POST" })
+  .inputValidator((data: { email: string; password: string }) => ({
+    email: email(data?.email),
+    password: text(data?.password, 200),
+  }))
   .handler(async ({ data }) => {
-    const { getCreatorAccessForEmail } = await import("./access.server");
-    return getCreatorAccessForEmail(data.email);
+    const { creatorLogin: login } = await import("./access.server");
+    return login(data.email, data.password);
+  });
+
+export const creatorLogout = createServerFn({ method: "POST" }).handler(async () => {
+  const { creatorLogout: logout } = await import("./access.server");
+  return logout();
   });
 
 export const bootstrapAdmin = createServerFn({ method: "POST" })

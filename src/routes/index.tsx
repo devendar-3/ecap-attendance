@@ -4,10 +4,9 @@ import { useServerFn } from "@tanstack/react-start";
 import { ScanLine, Camera, FileDown, ShieldAlert, MapPin, Loader2, Mail, LogIn } from "lucide-react";
 
 import { createSession as createSessionFn } from "@/lib/rollcall.functions";
-import { getCreatorAccessState, requestAccess } from "@/lib/access.functions";
+import { creatorLogout, getCreatorAccessState, requestAccess } from "@/lib/access.functions";
 import { DEFAULT_RADIUS_M, readPosition } from "@/lib/geo";
 import { RadiusPicker } from "@/components/RadiusPicker";
-import { supabase } from "@/integrations/supabase/client";
 
 
 export const Route = createFileRoute("/")({
@@ -37,6 +36,7 @@ function Home() {
   const runCreateSession = useServerFn(createSessionFn);
   const runGetAccess = useServerFn(getCreatorAccessState);
   const runRequestAccess = useServerFn(requestAccess);
+  const runCreatorLogout = useServerFn(creatorLogout);
   const [title, setTitle] = useState("");
   const [format, setFormat] = useState("");
   const [creating, setCreating] = useState(false);
@@ -49,24 +49,18 @@ function Home() {
   const [accessStatus, setAccessStatus] = useState<"approved" | "rejected" | "revoked" | "pending" | null>(null);
   const [accessName, setAccessName] = useState("");
   const [accessEmail, setAccessEmail] = useState("");
+  const [accessPassword, setAccessPassword] = useState("");
   const [accessBusy, setAccessBusy] = useState(false);
   const [accessMessage, setAccessMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
-    void supabase.auth.getUser().then(async ({ data }) => {
+    void runGetAccess().then((state) => {
       if (!active) return;
-      if (!data.user) {
-        setSignedIn(false);
-        return;
-      }
-      setSignedIn(true);
-      try {
-        const state = await runGetAccess();
-        if (active) setAccessStatus(state.status);
-      } catch {
-        if (active) setAccessStatus(null);
-      }
+      setSignedIn(state.signedIn);
+      setAccessStatus(state.status);
+    }).catch(() => {
+      if (active) setAccessStatus(null);
     });
     return () => {
       active = false;
@@ -78,10 +72,11 @@ function Home() {
     setAccessBusy(true);
     setAccessMessage(null);
     try {
-      await runRequestAccess({ data: { name: accessName, email: accessEmail } });
+      await runRequestAccess({ data: { name: accessName, email: accessEmail, password: accessPassword } });
       setAccessMessage("Access request sent to administrator. You can create sessions after your request is approved.");
       setAccessName("");
       setAccessEmail("");
+      setAccessPassword("");
     } catch (requestError) {
       setAccessMessage(requestError instanceof Error ? requestError.message : "Could not send the access request");
     } finally {
@@ -153,6 +148,20 @@ function Home() {
                 <div>
                   <h2 className="text-xl font-semibold">Request creator access</h2>
                   <p className="mt-1 text-sm text-muted-foreground">Get permission to create attendance sessions.</p>
+                </div>
+                <div>
+                  <label htmlFor="access-password" className="text-sm font-medium">Password</label>
+                  <input
+                    id="access-password"
+                    type="password"
+                    autoComplete="new-password"
+                    minLength={8}
+                    required
+                    value={accessPassword}
+                    onChange={(event) => setAccessPassword(event.target.value)}
+                    className="mt-1.5 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ring"
+                  />
+                  <p className="mt-1.5 text-xs text-muted-foreground">Use at least 8 characters. You will use it after approval.</p>
                 </div>
                 <Mail className="size-5 shrink-0 text-accent" />
               </div>
