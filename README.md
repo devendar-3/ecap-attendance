@@ -5,7 +5,7 @@ RollCall is a frictionless attendance system that requires no user accounts or i
 
 This project was built with [Lovable](https://lovable.dev).
 
-**Live app**: https://ecap-attendance.lovable.app
+**Live app**:  https://attendancesessioncreator.lovable.app/
 
 ## Build with Lovable
 
