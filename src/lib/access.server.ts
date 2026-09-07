@@ -162,6 +162,7 @@ export async function creatorLogin(email: string, password: string) {
     .select("status,password_hash,password_salt")
     .eq("email", email)
     .order("updated_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (!data || data.status !== "approved") {
     throw new Error(
