@@ -1,9 +1,17 @@
 import { createServerFn } from "@tanstack/react-start";
 
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
 function text(value: unknown, max: number) {
   if (typeof value !== "string") throw new Error("Invalid input");
   const result = value.trim();
   if (!result || result.length > max) throw new Error("Please check the entered details");
+  return result;
+}
+
+function creatorPassword(value: unknown) {
+  const result = text(value, 200);
+  if (result.length < 8) throw new Error("Password must be at least 8 characters");
   return result;
 }
 
@@ -17,7 +25,7 @@ export const requestAccess = createServerFn({ method: "POST" })
   .inputValidator((data: { name: string; email: string; password: string }) => ({
     name: text(data?.name, 120),
     email: email(data?.email),
-    password: text(data?.password, 200),
+    password: creatorPassword(data?.password),
   }))
   .handler(async ({ data }) => {
     const { requestCreatorAccess } = await import("./access.server");
@@ -33,7 +41,7 @@ export const getCreatorAccessState = createServerFn({ method: "GET" })
 export const creatorLogin = createServerFn({ method: "POST" })
   .inputValidator((data: { email: string; password: string }) => ({
     email: email(data?.email),
-    password: text(data?.password, 200),
+    password: creatorPassword(data?.password),
   }))
   .handler(async ({ data }) => {
     const { creatorLogin: login } = await import("./access.server");
@@ -43,7 +51,7 @@ export const creatorLogin = createServerFn({ method: "POST" })
 export const creatorLogout = createServerFn({ method: "POST" }).handler(async () => {
   const { creatorLogout: logout } = await import("./access.server");
   return logout();
-  });
+});
 
 export const bootstrapAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
