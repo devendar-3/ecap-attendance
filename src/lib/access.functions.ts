@@ -1,7 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
 function text(value: unknown, max: number) {
   if (typeof value !== "string") throw new Error("Invalid input");
   const result = value.trim();
@@ -52,13 +50,6 @@ export const creatorLogout = createServerFn({ method: "POST" }).handler(async ()
   const { creatorLogout: logout } = await import("./access.server");
   return logout();
 });
-
-export const bootstrapAdmin = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { bootstrapInitialAdmin } = await import("./access.server");
-    return bootstrapInitialAdmin(context.userId);
-  });
 
 export const getAdminSetup = createServerFn({ method: "GET" }).handler(async () => {
   const { getAdminSessionState } = await import("./access.server");
