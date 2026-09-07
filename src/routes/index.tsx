@@ -12,20 +12,40 @@ import { RadiusPicker } from "@/components/RadiusPicker";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "RollCall — ID scan + live selfie attendance sessions" },
+      { title: "Free Anti-Proxy Attendance App for Teachers | RollCall" },
       {
         name: "description",
         content:
-          "Create an attendance session in seconds. Students scan their ID card and take a live selfie; duplicate photos are flagged and results export to CSV.",
+          "Free attendance management system that stops proxy attendance. Students scan their college ID and take a live selfie; geofenced sessions, duplicate alerts, absentee list and CSV export.",
       },
-      { property: "og:title", content: "RollCall — ID scan + live selfie attendance" },
+      { property: "og:title", content: "Free Anti-Proxy Attendance App for Teachers | RollCall" },
       {
         property: "og:description",
         content:
-          "Create a session, share the code, let students verify with ID scan and a live selfie. Absentees and duplicate photos surface automatically.",
+          "Create a session, share the code, let students verify with ID scan and a live selfie. Geofencing, duplicate photo alerts and one-click CSV export.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:url", content: "https://attendancesessioncreator.lovable.app/" },
       { name: "twitter:card", content: "summary_large_image" },
+    ],
+    links: [
+      { rel: "canonical", href: "https://attendancesessioncreator.lovable.app/" },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebApplication",
+          name: "RollCall",
+          applicationCategory: "EducationalApplication",
+          operatingSystem: "Web",
+          url: "https://attendancesessioncreator.lovable.app/",
+          description:
+            "Anti-proxy attendance app for teachers. Students scan their college ID and take a live selfie; duplicate selfies are flagged and results export to CSV.",
+          offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+        }),
+      },
     ],
   }),
   component: Home,
@@ -332,6 +352,70 @@ function Home() {
           </ul>
         </section>
       </div>
+
+      <section className="panel mt-6 p-6 sm:p-8">
+        <h2 className="text-xl font-semibold">Built to stop proxy attendance</h2>
+        <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+          RollCall is a free online attendance management system for teachers, tutors and colleges.
+          No student logins, no installs — you create a session and share one code.
+        </p>
+        <div className="mt-6 grid gap-6 sm:grid-cols-3">
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <ScanLine className="size-4 shrink-0 text-accent" /> ID scan + live selfie
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Each student scans their college ID card — name and roll number are read
+              automatically — then takes a live selfie so one person can't mark many.
+            </p>
+          </div>
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <MapPin className="size-4 shrink-0 text-accent" /> Classroom geofencing
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Lock a session to your classroom radius. A shared link only works on devices inside
+              the room, so a proxy outside can't submit.
+            </p>
+          </div>
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <ShieldAlert className="size-4 shrink-0 text-accent" /> Duplicate detection
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              The same selfie from two roll numbers is flagged for you. Review it, then mark
+              present or absent manually.
+            </p>
+          </div>
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <FileDown className="size-4 shrink-0 text-accent" /> Present &amp; absent export
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Upload your student roster as a PDF and absentees stand out instantly. Export the
+              final present list as CSV for your records.
+            </p>
+          </div>
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <Camera className="size-4 shrink-0 text-accent" /> Any number of students
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Set your own roll-number format, from 10 students to 500. Students join with a code
+              — no app install, no account.
+            </p>
+          </div>
+          <div>
+            <h3 className="flex items-center gap-2 text-sm font-semibold">
+              <Mail className="size-4 shrink-0 text-accent" /> Simple for teachers
+            </h3>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Request access once, sign in with your email, and create unlimited attendance
+              sessions from any device.
+            </p>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
